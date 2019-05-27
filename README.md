@@ -10,8 +10,14 @@
 ## Ссылка на проект:
 [СХЕМА И ПЕЧАТНАЯ ПЛАТА:](https://easyeda.com/golinskiy.konstantin/esp_led_mqtt_v2-0/)
 
-## ФОТО ГОТОВОГО ИЗДЕЛИЯ:
-![](https://github.com/GolinskiyKonstantin/Led_Dimmer_MQTT_ESP8266/blob/master/image/001.jpg)
-
 ## Ссылка на видео:
 [ВИДЕО:](https://www.youtube.com/watch?v=7cRhUtCjl7g)
+
+## ФОТО ГОТОВОГО ИЗДЕЛИЯ:
+![](https://github.com/GolinskiyKonstantin/Led_Dimmer_MQTT_ESP8266/blob/master/image/001.jpg)
+![](https://github.com/GolinskiyKonstantin/Led_Dimmer_MQTT_ESP8266/blob/master/image/003.jpg)
+![](https://github.com/GolinskiyKonstantin/Led_Dimmer_MQTT_ESP8266/blob/master/image/002.jpg)
+
+По всем вопросам пишите: golinskiy.konstantin@gmail.com
+
+
