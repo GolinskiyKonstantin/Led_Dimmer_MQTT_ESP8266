@@ -56,8 +56,8 @@ uint16_t mqttPort = 1883;   // Указываем порт по умолчани
 const uint8_t LedPin = 4;    // Указываем порт светодиодная лента по умолчанию ( порт на которо весит светодиодная лента )
 boolean LedOnBoot = false;   // Указываем по умолчанию будет ли Led при старте вкл или выкл
 
-const int pinEncoderB = 12;  // Подключаем к пину  (DT)  D6
-const int pinEncoderA = 13;  // Подключаем к пину  (CLK)  D7
+const uint8_t pinEncoderB = 12;  // Подключаем к пину  (DT)  D6
+const uint8_t pinEncoderA = 13;  // Подключаем к пину  (CLK)  D7
 Encoder myEnc(pinEncoderB, pinEncoderA);  // Контакты энкодера канал А и В, или DT и CLK. ( меняем местами и будет инверсия прокрутки )
 
 const uint8_t pinMqttConectLed = 16; // свентодиод показывает соединение с сервером MQTT, GPIO 16
@@ -75,9 +75,13 @@ const uint8_t buttonSwitch = 14; // GIPIO 14 Пин к которому буде
 OneButton button(buttonSwitch, true);
 
 
-long oldPosition  = -999;
+int32_t oldPosition  = -999;
 
-int LEDbridge = 8;  // яркость ленты 0-1023
+// яркость ленты 8-1023
+uint16_t LEDbridgeMIN = 8;
+uint16_t LEDbridgeMAX = 1023;
+uint16_t LEDbridge = LEDbridgeMIN;  
+
 bool onOff = false;
 
 
@@ -880,16 +884,25 @@ void mqttCallback(char* topic, uint8_t* payload, uint32_t length) {
     }
   }
   if (! strncmp(topicBody, mqttTopicPWM.c_str(), mqttTopicPWM.length())) {
-     unsigned int intValue = NULL;                     // Максимальное число unsigned int около 64000, если нужно больше то делаем unsigned long 
+     uint16_t intValue = NULL;                     // Максимальное число unsigned int около 64000, если нужно больше то делаем unsigned long 
       // Так как передаем несколько битов используем вместо unsigned char charValue = (char)payload[0]; конструкцию for
       // Побитово считываем и собираем в переменную данные полученные с топиков на которые это устройство подписаное.
-           for (int i=0;i<length;i++){                       // В цикле считываем столько бит сколько пришло нам.
+           for (uint16_t i=0;i<length;i++){                       // В цикле считываем столько бит сколько пришло нам.
                   if(i)intValue *= 10;                        // При каждой итерации ( кроме первой ) текущее значение умножается на 10 и прибавляются полученные данные, тем самым собираем полученное значение в 1 переменную
                                                               // так как за каждую итерацию считывается 1 число. Например значение 247 состоит из 3 значений 2,4 и 7 и за 3 итерации собераем из них значение 247
                   intValue += ((int)payload[i] - 48);         // Так как из банных типа byte при переводе в int, переменная будет содержать номер символа по ASCI. К примеру чифра 0  имеет код 48. Поэтому отняв от результата 48 номер символа будет совпадать с самим символом
            }
-
-        LEDbridge = intValue;
+           
+        if( intValue < LEDbridgeMIN ){
+          LEDbridge = LEDbridgeMIN;
+          mqtt_publish(pubsubClient, mqttTopicPWM, String(LEDbridge), true);
+        }
+        else if( intValue > LEDbridgeMAX ){
+          LEDbridge = LEDbridgeMAX;
+          mqtt_publish(pubsubClient, mqttTopicPWM, String(LEDbridge), true);
+        }
+        else LEDbridge = intValue;
+        
         if(onOff){ 
           analogWrite(LedPin, LEDbridge); 
         }
@@ -1009,6 +1022,19 @@ void buttonPush() {
     }
 }
 
+/////////////////////////////////////////////////
+void encoderMqtt(){
+  
+  flagPressButton = true; // При отсудствии связи с брокером если меняли положение Led кнопкой механической
+  
+  if (mqttServer.length() && pubsubClient.connected()) {
+        String topicPWM;
+        topicPWM += mqttTopicPWM;
+  mqtt_publish(pubsubClient, topicPWM, String(LEDbridge), true);
+  }
+}
+////////////////////////////////////////////////
+
 void wifiRssiNow(){
   //======= Определения уровня сигнала сети =============================================================================================================================      
      // Уровень сигнала к подключенному роутеру ( возвращает данные в dBm отрицательное значение )
@@ -1022,18 +1048,12 @@ void wifiRssiNow(){
 void TimeUpStart(){
   timeValue++;
 }  
-
-void encoderMqtt(){
-  if (mqttServer.length() && pubsubClient.connected()) {
-        String topicPWM;
-        topicPWM += mqttTopicPWM;
-  mqtt_publish(pubsubClient, topicPWM, String(LEDbridge), true);
-  }
-}
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
-  Serial.begin(115200);
+  #ifdef TestSerialPrint
+    Serial.begin(115200);
+  #endif
   
   timerId = timer.setInterval( APtoSTAreconnect, setupWiFi );
   timerRssi.setInterval( 1L*1000L, wifiRssiNow );
@@ -1132,16 +1152,18 @@ void loop() {
 
   /////////////////////////////////////////////
   if(onOff){
-          long newPosition = myEnc.read();
+          int32_t newPosition = myEnc.read();
           if (newPosition != oldPosition && newPosition != 0) {
              if(newPosition>oldPosition){
-                for(int i=0; i<8;i++){    // Делаем 8 циклов.
-                    if(LEDbridge<1023) LEDbridge++;
+                for(uint8_t i=0; i<8;i++){    // Делаем 8 циклов.
+                    if(LEDbridge<LEDbridgeMAX) LEDbridge++;
+                    else break;
                 }
              }
              else{
-                for(int i=0; i<8;i++){  // Делаем 8 циклов.
-                    if(LEDbridge>8) LEDbridge--;
+                for(uint8_t i=0; i<8;i++){  // Делаем 8 циклов.
+                    if(LEDbridge>LEDbridgeMIN) LEDbridge--;
+                    else break;
                 }
              }
             oldPosition = newPosition;
